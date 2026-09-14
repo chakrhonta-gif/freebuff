@@ -1,0 +1,26 @@
+{
+  "name": "freebuff-chatgpt-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local MCP Apps bridge for running Freebuff from ChatGPT.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@codebuff/sdk": "^0.10.7",
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3"
+  }
+}
