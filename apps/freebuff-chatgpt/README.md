@@ -35,8 +35,7 @@ PowerShell example:
 cd apps\freebuff-chatgpt
 npm install
 $env:FREEBUFF_WORKSPACE_ROOT = "C:\path\to\your\project"
-$env:FREEBUFF_BYOK_API_KEY = "your_api_key"
-$env:FREEBUFF_BYOK_MODEL = "gpt-5.6"
+$env:CODEBUFF_API_KEY = "your_codebuff_api_key"
 npm run dev
 ~~~
 
