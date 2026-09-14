@@ -5,9 +5,11 @@ import { useState } from 'react';
 type Mode = 'plan' | 'implement';
 
 type RunResult = {
-  id: string | null;
   mode: Mode;
-  result: string;
+  status: 'queued';
+  requestId: string;
+  workflowUrl: string;
+  message: string;
 };
 
 function isImplementationMode(mode: Mode) {
@@ -31,7 +33,7 @@ export default function Home() {
     }
 
     if (isImplementationMode(nextMode) && !confirmed) {
-      setError('Tick the confirmation box before generating an implementation draft.');
+      setError('Tick the confirmation box before starting the implementation run.');
       return;
     }
 
@@ -53,19 +55,15 @@ export default function Home() {
 
       const payload = (await response.json()) as RunResult & { error?: string };
       if (!response.ok || payload.error) {
-        throw new Error(payload.error || 'Freebuff could not complete this request.');
+        throw new Error(payload.error || 'Freebuff could not start this request.');
       }
 
-      setRun({
-        id: payload.id || null,
-        mode: payload.mode,
-        result: payload.result,
-      });
+      setRun(payload);
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
-          : 'Freebuff could not complete this request.',
+          : 'Freebuff could not start this request.',
       );
     } finally {
       setBusy(false);
@@ -76,29 +74,26 @@ export default function Home() {
     <main className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Freebuff home">
-          <span className="brand-mark" aria-hidden="true">
-            F
-          </span>
+          <span className="brand-mark" aria-hidden="true">F</span>
           <span>Freebuff</span>
         </a>
-        <span className="status-pill">Private coding workspace</span>
+        <span className="status-pill">Private repository runner</span>
       </header>
 
       <section className="hero">
         <div>
-          <p className="eyebrow">OpenAI-powered coding assistant</p>
-          <h1>Plan safely. Generate the next change with clarity.</h1>
+          <p className="eyebrow">Codebuff + GitHub Actions</p>
+          <h1>Run Freebuff on your repository, safely.</h1>
           <p className="lead">
-            Give Freebuff a coding task and the relevant project context. Start
-            with a plan, then explicitly confirm before you ask for an
-            implementation draft.
+            Start with a read-only plan. For an implementation, Freebuff works
+            in an isolated GitHub runner and opens a pull request for review.
           </p>
         </div>
         <aside className="safety-card">
           <strong>Safe by default</strong>
           <span>
-            This hosted MVP never writes to a repository or your computer.
-            It returns a reviewable plan or change proposal.
+            Plans cannot write to the repository. Implementations never push to
+            main: they create a separate pull request.
           </span>
         </aside>
       </section>
@@ -127,7 +122,7 @@ export default function Home() {
             aria-selected={mode === 'implement'}
             type="button"
           >
-            Implementation draft
+            Implement to PR
           </button>
         </div>
 
@@ -143,15 +138,13 @@ export default function Home() {
         </label>
 
         <label className="field">
-          <span>
-            Relevant files or project context <em>(optional)</em>
-          </span>
+          <span>Constraints or extra context <em>(optional)</em></span>
           <textarea
             value={context}
             onChange={(event) => setContext(event.target.value)}
-            placeholder="Paste selected files, error messages, constraints, or the current architecture."
+            placeholder="Describe expected behavior, relevant paths, error messages, or constraints."
             rows={8}
-            maxLength={20000}
+            maxLength={18000}
           />
         </label>
 
@@ -163,8 +156,8 @@ export default function Home() {
               type="checkbox"
             />
             <span>
-              I understand this creates a proposed implementation for review; it
-              will not change any files automatically.
+              I understand that Freebuff will work in an isolated runner and
+              create a pull request for my review. It will not push to main.
             </span>
           </label>
         ) : null}
@@ -177,18 +170,16 @@ export default function Home() {
             type="button"
           >
             {busy
-              ? 'Freebuff is working…'
+              ? 'Starting Freebuff…'
               : mode === 'plan'
-                ? 'Create a plan'
-                : 'Generate implementation draft'}
+                ? 'Run a read-only plan'
+                : 'Run Freebuff and create a PR'}
           </button>
           <button
             className="secondary-action"
             disabled={busy}
             onClick={() => {
-              setTask(
-                'Review this feature request and identify the smallest safe implementation plan.',
-              );
+              setTask('Review this feature request and identify the smallest safe implementation plan.');
               setContext('');
               setMode('plan');
               setConfirmed(false);
@@ -208,35 +199,35 @@ export default function Home() {
         <section className="result-card" aria-live="polite">
           <div className="result-header">
             <div>
-              <p className="eyebrow">Freebuff result</p>
-              <h2>
-                {run.mode === 'plan'
-                  ? 'Implementation plan'
-                  : 'Implementation draft'}
-              </h2>
+              <p className="eyebrow">Freebuff run queued</p>
+              <h2>{run.mode === 'plan' ? 'Read-only plan' : 'Implementation to pull request'}</h2>
             </div>
             <span className="result-mode">{run.mode}</span>
           </div>
-          <pre>{run.result}</pre>
+          <div className="queued-result">
+            <p>{run.message}</p>
+            <a className="run-link" href={run.workflowUrl} rel="noreferrer" target="_blank">
+              Open GitHub Actions
+            </a>
+            <code>Request: {run.requestId}</code>
+          </div>
         </section>
       ) : (
         <section className="empty-result">
-          <span className="empty-icon" aria-hidden="true">
-            {'</>'}
-          </span>
+          <span className="empty-icon" aria-hidden="true">{'</>'}</span>
           <div>
-            <strong>Your result will appear here.</strong>
+            <strong>Your run will appear here.</strong>
             <p>
-              Start with Plan. When the plan looks right, choose Implementation
-              draft and review the generated changes.
+              Start with Plan. When it looks right, choose Implement to PR and
+              review the new pull request before merging it.
             </p>
           </div>
         </section>
       )}
 
       <footer>
-        Freebuff Site MVP · Your API key stays on the server and is never sent
-        to the browser.
+        Freebuff runs Codebuff in GitHub Actions. Secrets stay server-side and
+        are never sent to the browser.
       </footer>
     </main>
   );
