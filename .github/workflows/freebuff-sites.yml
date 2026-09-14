@@ -1,0 +1,30 @@
+name: Validate Freebuff Sites app
+
+on:
+  push:
+    branches:
+      - feat/freebuff-sites-openai
+    paths:
+      - apps/freebuff-sites/**
+      - .github/workflows/freebuff-sites.yml
+  pull_request:
+    paths:
+      - apps/freebuff-sites/**
+      - .github/workflows/freebuff-sites.yml
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/freebuff-sites
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/freebuff-sites/package.json
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
