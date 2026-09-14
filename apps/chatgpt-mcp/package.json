@@ -1,0 +1,13 @@
+{
+  "name": "@freebuff/chatgpt-mcp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "zod": "^4.2.1"
+  }
+}
