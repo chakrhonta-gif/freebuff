@@ -1,0 +1,126 @@
+name: Freebuff repository runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "plan or implement"
+        required: true
+        type: choice
+        options:
+          - plan
+          - implement
+      task:
+        description: "Requested coding task"
+        required: true
+        type: string
+      context:
+        description: "Optional context and constraints"
+        required: false
+        type: string
+      request_id:
+        description: "Site correlation id"
+        required: true
+        type: string
+
+jobs:
+  agent:
+    name: Run Codebuff
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RUNNER_DIR: ${{ runner.temp }}/freebuff-runner
+      FREEBUFF_MODE: ${{ inputs.mode }}
+      FREEBUFF_TASK: ${{ inputs.task }}
+      FREEBUFF_CONTEXT: ${{ inputs.context }}
+      FREEBUFF_REQUEST_ID: ${{ inputs.request_id }}
+      CODEBUFF_API_KEY: ${{ secrets.CODEBUFF_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare isolated runner
+        run: |
+          test -n "$CODEBUFF_API_KEY"
+          mkdir -p "$RUNNER_DIR/out"
+          cp .github/scripts/freebuff-runner.mjs "$RUNNER_DIR/runner.mjs"
+          npm install --prefix "$RUNNER_DIR" --no-save @codebuff/sdk@0.10.7
+
+      - name: Lock the repository for a plan run
+        if: inputs.mode == 'plan'
+        run: chmod -R a-w "$GITHUB_WORKSPACE"
+
+      - name: Run Codebuff
+        run: node "$RUNNER_DIR/runner.mjs"
+
+      - name: Show result summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_DIR/out/result.md" ]; then
+            sed -n '1,320p' "$RUNNER_DIR/out/result.md"
+          fi
+
+      - name: Upload Freebuff result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebuff-result-${{ github.run_id }}
+          path: ${{ runner.temp }}/freebuff-runner/out
+          if-no-files-found: warn
+          retention-days: 7
+
+  publish_pull_request:
+    name: Create review pull request
+    if: inputs.mode == 'implement'
+    needs: agent
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: freebuff-result-${{ github.run_id }}
+          path: .freebuff-result
+
+      - name: Validate generated patch
+        env:
+          PATCH: .freebuff-result/freebuff.patch
+        run: |
+          test -s "$PATCH"
+          git apply --check "$PATCH"
+          changed="$(git apply --numstat "$PATCH" | cut -f3-)"
+          if printf '%s\n' "$changed" | grep -E '(^\.github/|(^|/)\.env($|\.)|(^|/).+\.(pem|key)$|(^|/)id_rsa$)'; then
+            echo "Blocked a generated change to a sensitive path."
+            exit 1
+          fi
+
+      - name: Apply patch and open pull request
+        env:
+          PATCH: .freebuff-result/freebuff.patch
+          TASK: ${{ inputs.task }}
+          REQUEST_ID: ${{ inputs.request_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git apply --3way --whitespace=nowarn "$PATCH"
+          branch="freebuff/run-${{ github.run_id }}"
+          git switch -c "$branch"
+          git config user.name "freebuff[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: Freebuff implementation $REQUEST_ID"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Freebuff: ${TASK:0:72}" \
+            --body "Created by the Freebuff GitHub Actions runner. Request: `$REQUEST_ID`. Review the diff and checks before merging."
