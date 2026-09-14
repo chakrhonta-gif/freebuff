@@ -142,7 +142,7 @@ function workspaceSnapshot() {
       ? "Freebuff is ready for a plan or an explicitly confirmed implementation."
       : !workspaceFound
         ? "The configured workspace folder does not exist."
-        : "Add CODEBUFF_API_KEY or FREEBUFF_BYOK_API_KEY before running a task.",
+        : "Add CODEBUFF_API_KEY before running a task.",
   };
 }
 
