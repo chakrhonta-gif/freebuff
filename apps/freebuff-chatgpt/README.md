@@ -40,14 +40,11 @@ $env:FREEBUFF_BYOK_MODEL = "gpt-5.6"
 npm run dev
 ~~~
 
-## Configure a runner
+## Configure the runner
 
-Choose one credential method. Keep the value in your shell or a local .env file only.
+Set CODEBUFF_API_KEY in your shell or local .env file before starting the server. The published Codebuff SDK uses this credential to run the agent.
 
-1. Set CODEBUFF_API_KEY for the normal Codebuff service.
-2. Or set FREEBUFF_BYOK_API_KEY for an OpenAI-compatible provider. You can also set FREEBUFF_BYOK_MODEL and FREEBUFF_BYOK_BASE_URL.
-
-ChatGPT Plus is separate from an OpenAI API key. A BYOK runner uses the provider account attached to the API key.
+A ChatGPT Plus subscription is separate from a Codebuff API key. This local bridge does not send your ChatGPT account token to Freebuff.
 
 ## Check locally
 
