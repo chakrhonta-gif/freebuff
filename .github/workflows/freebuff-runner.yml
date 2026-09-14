@@ -30,7 +30,6 @@ jobs:
     permissions:
       contents: read
     env:
-      RUNNER_DIR: ${{ runner.temp }}/freebuff-runner
       FREEBUFF_MODE: ${{ inputs.mode }}
       FREEBUFF_TASK: ${{ inputs.task }}
       FREEBUFF_CONTEXT: ${{ inputs.context }}
@@ -40,6 +39,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -48,6 +48,8 @@ jobs:
       - name: Prepare isolated runner
         run: |
           test -n "$CODEBUFF_API_KEY"
+          RUNNER_DIR="$RUNNER_TEMP/freebuff-runner"
+          echo "RUNNER_DIR=$RUNNER_DIR" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_DIR/out"
           cp .github/scripts/freebuff-runner.mjs "$RUNNER_DIR/runner.mjs"
           npm install --prefix "$RUNNER_DIR" --no-save @codebuff/sdk@0.10.7
@@ -91,11 +93,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: freebuff-result-${{ github.run_id }}
-          path: .freebuff-result
+          path: ${{ runner.temp }}/freebuff-result
 
       - name: Validate generated patch
         env:
-          PATCH: .freebuff-result/freebuff.patch
+          PATCH: ${{ runner.temp }}/freebuff-result/freebuff.patch
         run: |
           test -s "$PATCH"
           git apply --check "$PATCH"
@@ -107,7 +109,7 @@ jobs:
 
       - name: Apply patch and open pull request
         env:
-          PATCH: .freebuff-result/freebuff.patch
+          PATCH: ${{ runner.temp }}/freebuff-result/freebuff.patch
           TASK: ${{ inputs.task }}
           REQUEST_ID: ${{ inputs.request_id }}
           GH_TOKEN: ${{ github.token }}
@@ -119,8 +121,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: Freebuff implementation $REQUEST_ID"
+          git push --set-upstream origin "$branch"
           gh pr create \
             --base main \
             --head "$branch" \
             --title "Freebuff: ${TASK:0:72}" \
-            --body "Created by the Freebuff GitHub Actions runner. Request: `$REQUEST_ID`. Review the diff and checks before merging."
+            --body "Created by the Freebuff GitHub Actions runner. Request: $REQUEST_ID. Review the diff and checks before merging."
