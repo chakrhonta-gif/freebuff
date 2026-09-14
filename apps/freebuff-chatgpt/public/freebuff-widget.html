@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Freebuff run</title>
+    <style>
+      :root {
+        color: #15202b;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #f8fafc;
+      }
+
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+
+      .card {
+        overflow: hidden;
+        border: 1px solid #d9e2ec;
+        border-radius: 16px;
+        background: #ffffff;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+      }
+
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 20px 20px 16px;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #ffffff;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+
+      .status {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status.completed {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status.failed {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
+      .status.waiting {
+        background: #e2e8f0;
+        color: #334155;
+      }
+
+      .body {
+        padding: 20px;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .meta-item {
+        min-width: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px;
+        background: #f8fafc;
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 4px;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .value {
+        overflow-wrap: anywhere;
+        color: #0f172a;
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .section {
+        margin-top: 18px;
+      }
+
+      .section h2 {
+        margin: 0 0 8px;
+        color: #334155;
+        font-size: 13px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .request,
+      .summary,
+      .events {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px;
+        background: #ffffff;
+        color: #334155;
+        font-size: 14px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+
+      .events {
+        margin-top: 8px;
+        padding-left: 32px;
+        background: #f8fafc;
+      }
+
+      .events li + li {
+        margin-top: 7px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 9px 12px;
+        background: #0f172a;
+        color: #ffffff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      button.secondary {
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #334155;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.6;
+      }
+
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 84px;
+        resize: vertical;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 10px 12px;
+        color: #0f172a;
+        font: inherit;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .hint {
+        margin: 8px 0 0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .error {
+        margin-top: 10px;
+        color: #b91c1c;
+        font-size: 13px;
+      }
+
+      @media (max-width: 540px) {
+        main {
+          padding: 10px;
+        }
+
+        .header,
+        .body {
+          padding: 16px;
+        }
+
+        .meta {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="root" aria-live="polite"></main>
+    <script>
+      (() => {
+        const root = document.getElementById("root");
+        const state = {
+          data: null,
+          showEvents: false,
+          busy: false,
+          error: "",
+        };
+        const pendingRequests = new Map();
+        let nextRequestId = 1;
+
+        function element(tag, className, text) {
+          const node = document.createElement(tag);
+          if (className) node.className = className;
+          if (text !== undefined && text !== null) node.textContent = String(text);
+          return node;
+        }
+
+        function bridgeRequest(method, params) {
+          const id = nextRequestId++;
+          window.parent.postMessage(
+            {
+              jsonrpc: "2.0",
+              id,
+              method,
+              params,
+            },
+            "*",
+          );
+
+          return new Promise((resolve, reject) => {
+            pendingRequests.set(id, { resolve, reject });
+          });
+        }
+
+        function saveState() {
+          if (window.openai && window.openai.setWidgetState) {
+            window.openai.setWidgetState({
+              privateContent: {
+                showEvents: state.showEvents,
+              },
+            });
+          }
+        }
+
+        function copyText(value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value).catch(() => {});
+          }
+        }
+
+        function addMeta(container, label, value) {
+          const item = element("div", "meta-item");
+          item.append(element("span", "label", label));
+          item.append(element("span", "value", value || "—"));
+          container.append(item);
+        }
+
+        function render(data) {
+          root.replaceChildren();
+          const card = element("section", "card");
+          const header = element("div", "header");
+          const titleGroup = element("div");
+          titleGroup.append(element("p", "eyebrow", "Freebuff"));
+          titleGroup.append(element("h1", "", data && data.runId ? "Coding task run" : "Workspace dashboard"));
+
+          const status = data && data.status ? data.status : "waiting";
+          header.append(titleGroup);
+          header.append(element("span", "status " + status, status));
+          card.append(header);
+
+          const body = element("div", "body");
+
+          if (!data || !data.runId) {
+            body.append(
+              element(
+                "p",
+                "summary",
+                "Ask ChatGPT to check the Freebuff workspace, plan a coding task, or render a completed run.",
+              ),
+            );
+            card.append(body);
+            root.append(card);
+            return;
+          }
+
+          const meta = element("div", "meta");
+          addMeta(meta, "Mode", data.mode);
+          addMeta(meta, "Runner", data.runner);
+          addMeta(meta, "Workspace", data.workspaceName);
+          addMeta(meta, "Session", data.sessionId);
+          body.append(meta);
+
+          const requestSection = element("section", "section");
+          requestSection.append(element("h2", "", "Request"));
+          requestSection.append(element("div", "request", data.request));
+          body.append(requestSection);
+
+          const summarySection = element("section", "section");
+          summarySection.append(element("h2", "", "Result"));
+          summarySection.append(element("div", "summary", data.summary));
+          body.append(summarySection);
+
+          const actions = element("div", "actions");
+          const copyButton = element("button", "secondary", "Copy session ID");
+          copyButton.type = "button";
+          copyButton.onclick = () => copyText(data.sessionId);
+          actions.append(copyButton);
+
+          if (Array.isArray(data.events) && data.events.length) {
+            const eventButton = element(
+              "button",
+              "secondary",
+              state.showEvents ? "Hide activity" : "Show activity",
+            );
+            eventButton.type = "button";
+            eventButton.onclick = () => {
+              state.showEvents = !state.showEvents;
+              saveState();
+              render(data);
+            };
+            actions.append(eventButton);
+          }
+
+          body.append(actions);
+
+          if (state.showEvents && Array.isArray(data.events) && data.events.length) {
+            const activity = element("section", "section");
+            activity.append(element("h2", "", "Agent activity"));
+            const list = element("ol", "events");
+            data.events.forEach((event) => list.append(element("li", "", event)));
+            activity.append(list);
+            body.append(activity);
+          }
+
+          if (data.status === "completed") {
+            const followUp = element("section", "section");
+            followUp.append(element("h2", "", "Plan a follow-up"));
+            const input = document.createElement("textarea");
+            input.placeholder = "Describe the next change to plan in this same workspace";
+            followUp.append(input);
+
+            const planButton = element(
+              "button",
+              "",
+              state.busy ? "Planning…" : "Plan follow-up",
+            );
+            planButton.type = "button";
+            planButton.disabled = state.busy;
+            planButton.onclick = async () => {
+              const prompt = input.value.trim();
+              if (prompt.length < 10) {
+                state.error = "Write at least 10 characters for the follow-up.";
+                render(data);
+                return;
+              }
+
+              state.busy = true;
+              state.error = "";
+              render(data);
+
+              try {
+                const result = await bridgeRequest("tools/call", {
+                  name: "plan_freebuff_task",
+                  arguments: {
+                    prompt,
+                    sessionId: data.sessionId,
+                  },
+                });
+                const next = result && result.structuredContent;
+                if (next) {
+                  state.data = next;
+                  state.showEvents = false;
+                  saveState();
+                  render(next);
+                } else {
+                  state.error = "The plan finished without a structured result.";
+                  render(data);
+                }
+              } catch (error) {
+                state.error =
+                  (error && error.message) ||
+                  "Could not request a Freebuff follow-up plan.";
+                render(data);
+              } finally {
+                state.busy = false;
+              }
+            };
+            followUp.append(planButton);
+            followUp.append(
+              element(
+                "p",
+                "hint",
+                "This button creates a plan only. Ask in ChatGPT and explicitly approve before implementation.",
+              ),
+            );
+            body.append(followUp);
+          }
+
+          if (state.error) body.append(element("p", "error", state.error));
+
+          card.append(body);
+          root.append(card);
+        }
+
+        window.addEventListener(
+          "message",
+          (event) => {
+            if (event.source !== window.parent) return;
+            const message = event.data;
+            if (!message || message.jsonrpc !== "2.0") return;
+
+            if (message.id !== undefined && pendingRequests.has(message.id)) {
+              const pending = pendingRequests.get(message.id);
+              pendingRequests.delete(message.id);
+              if (message.error) pending.reject(message.error);
+              else pending.resolve(message.result);
+              return;
+            }
+
+            if (message.method === "ui/initialize") {
+              const output =
+                message.params &&
+                (message.params.toolOutput || message.params.structuredContent);
+              if (output) {
+                state.data = output.structuredContent || output;
+                render(state.data);
+              }
+              return;
+            }
+
+            if (message.method === "ui/notifications/tool-result") {
+              const output = message.params && message.params.structuredContent;
+              if (output) {
+                state.data = output;
+                render(output);
+              }
+            }
+          },
+          { passive: true },
+        );
+
+        const savedState = window.openai && window.openai.widgetState;
+        if (savedState && savedState.privateContent) {
+          state.showEvents = Boolean(savedState.privateContent.showEvents);
+        }
+
+        const initialOutput = window.openai && window.openai.toolOutput;
+        if (initialOutput) state.data = initialOutput.structuredContent || initialOutput;
+        render(state.data);
+      })();
+    </script>
+  </body>
+</html>

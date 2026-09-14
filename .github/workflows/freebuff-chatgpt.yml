@@ -1,0 +1,27 @@
+name: Validate Freebuff ChatGPT app
+
+on:
+  push:
+    branches:
+      - feat/freebuff-chatgpt-app
+    paths:
+      - apps/freebuff-chatgpt/**
+  pull_request:
+    paths:
+      - apps/freebuff-chatgpt/**
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/freebuff-chatgpt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/freebuff-chatgpt/package.json
+      - run: npm install
+      - run: npm run typecheck
