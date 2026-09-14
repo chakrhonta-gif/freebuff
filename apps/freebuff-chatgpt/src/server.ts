@@ -4,7 +4,6 @@ import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { CodebuffClient } from "@codebuff/sdk";
-import type { ResolvedByokConnection } from "@codebuff/sdk";
 import {
   registerAppResource,
   registerAppTool,
@@ -124,11 +123,9 @@ function safeText(value: unknown, limit: number): string {
 }
 
 function runnerName(): string {
-  if (cleanString(process.env.CODEBUFF_API_KEY)) return "Codebuff API";
-  if (cleanString(process.env.FREEBUFF_BYOK_API_KEY)) {
-    return "OpenAI-compatible BYOK";
-  }
-  return "Not configured";
+  return cleanString(process.env.CODEBUFF_API_KEY)
+    ? "Codebuff API"
+    : "Not configured";
 }
 
 function workspaceSnapshot() {
@@ -149,54 +146,17 @@ function workspaceSnapshot() {
   };
 }
 
-function makeByokConnection(): ResolvedByokConnection {
-  const apiKey = cleanString(process.env.FREEBUFF_BYOK_API_KEY);
-  if (!apiKey) {
+function createFreebuffClient(): CodebuffClient {
+  const codebuffApiKey = cleanString(process.env.CODEBUFF_API_KEY);
+  if (!codebuffApiKey) {
     throw new Error(
-      "No runner credential is configured. Add CODEBUFF_API_KEY or FREEBUFF_BYOK_API_KEY.",
+      "No Codebuff API key is configured. Add CODEBUFF_API_KEY before running a task.",
     );
   }
 
-  const now = new Date().toISOString();
-  const connection = {
-    id: "b58b9c0c-a98e-4d89-a7a4-52f55f07e001",
-    revision: 1,
-    name: "Freebuff ChatGPT local runner",
-    provider: "openai-compatible",
-    model: cleanString(process.env.FREEBUFF_BYOK_MODEL) || "gpt-5.6",
-    baseUrl:
-      cleanString(process.env.FREEBUFF_BYOK_BASE_URL) ||
-      "https://api.openai.com/v1",
-    credentialRef: "env:FREEBUFF_BYOK_API_KEY",
-    createdAt: now,
-    updatedAt: now,
-  } as ResolvedByokConnection;
-
-  Object.defineProperty(connection, "apiKey", {
-    value: apiKey,
-    enumerable: false,
-  });
-  Object.defineProperty(connection, "assertCurrent", {
-    value: async () => {},
-    enumerable: false,
-  });
-
-  return connection;
-}
-
-function createFreebuffClient(): CodebuffClient {
-  const codebuffApiKey = cleanString(process.env.CODEBUFF_API_KEY);
-
-  if (codebuffApiKey) {
-    return new CodebuffClient({
-      apiKey: codebuffApiKey,
-      cwd: workspaceRoot,
-    });
-  }
-
   return new CodebuffClient({
+    apiKey: codebuffApiKey,
     cwd: workspaceRoot,
-    byok: makeByokConnection(),
   });
 }
 
