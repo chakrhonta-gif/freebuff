@@ -74,13 +74,22 @@ try {
   throw error;
 }
 
+if (result.output?.type === 'error') {
+  await writeFile(join(outputDirectory, 'result.md'), '# Freebuff failed\n\n' + textOutput(result.output) + '\n');
+  throw new Error('Codebuff returned an error. See the run summary.');
+}
+
 const summary = textOutput(result.output);
 await writeFile(
   join(outputDirectory, 'result.md'),
   '# Freebuff ' + mode + ' run\n\nRequest: ' + requestId + '\n\n' + summary + '\n',
 );
 
-const patch = execFileSync('git', ['-C', workspace, 'diff', '--binary'], {
+// Include new files and staged edits; plan mode must not change the index.
+if (mode === 'implement') {
+  execFileSync('git', ['-C', workspace, 'add', '-A'], { stdio: 'pipe' });
+}
+const patch = execFileSync('git', ['-C', workspace, 'diff', 'HEAD', '--binary'], {
   encoding: 'utf8',
 });
 await writeFile(join(outputDirectory, 'freebuff.patch'), patch);
